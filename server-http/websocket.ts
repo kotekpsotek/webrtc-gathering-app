@@ -1,9 +1,35 @@
 import type { Server } from "socket.io";
 import { randomUUID } from "crypto";
-import { createClient } from "redis";
+import { RedisClientType, createClient } from "redis";
 
-// Collecting candidates for specific room
-const roomCandidates = new Map<string, string[]>();
+/** Manage candidates from room */
+type CandidatesLenFromRoom = number;
+class RoomCandidates {
+    client: RedisClientType;
+    roomId: string;
+    key: string;
+
+    constructor(client: RedisClientType, roomId: string) {
+        // Assign to class instance params values passed by client
+        this.client = client;
+        this.roomId = roomId;
+
+        // Assign facilitation room key name for each class instance
+        this.key = `room-candidates:${this.roomId}`;
+    }
+
+    async getRoomCandidates(): Promise<string[]> {
+        const candidatesLen = await this.client.LLEN(this.key);
+        
+        if (candidatesLen == 0) return [];
+        
+        return await this.client.LRANGE(this.key, 0, candidatesLen)
+    }
+
+    async addNewCandidate(candidate: string): Promise<CandidatesLenFromRoom> {
+        return await this.client.LPUSH(this.key, candidate)
+    }
+}
 
 export default async function main(socketInstance: Server) {
     const redisClient = createClient();
@@ -77,14 +103,10 @@ export default async function main(socketInstance: Server) {
         });
 
         // Listen for new candidates and send it to another peers "sitting in room"
-        socket.on("ice-candidate", (roomId: string, candidate: string) => {
+        socket.on("ice-candidate", async (roomId: string, candidate: string) => {
             if (roomId) {
-                // Collect candidate on candidates list for room
-                    // Get old candidates from room
-                const otherRoomCandidates = roomCandidates.get(roomId) || [];
-                    // Add new candidate to room candidates and update room candidates
-                otherRoomCandidates.push(candidate);
-                roomCandidates.set(roomId, otherRoomCandidates);
+                // Add new candidate to room
+                await new RoomCandidates(redisClient as any, roomId).addNewCandidate(candidate);
 
                 // Pass candidate forward to other peers in room
                 socket.in(roomId).emit("new-ice-candidate", candidate)
@@ -93,8 +115,8 @@ export default async function main(socketInstance: Server) {
         });
 
 
-        socket.on("get-room-ice-candidates", (roomId: string, cb) => {
-            const candidatesFor = roomCandidates.get(roomId) || [];
+        socket.on("get-room-ice-candidates", async (roomId: string, cb) => {
+            const candidatesFor = await new RoomCandidates(redisClient as any, roomId).getRoomCandidates();
             console.log(candidatesFor)
 
             // Return list of candidates
