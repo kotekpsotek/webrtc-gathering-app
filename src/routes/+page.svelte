@@ -2,13 +2,6 @@
     import { onMount } from "svelte";
     import { WebRTCConnection } from "$lib/webrtc";
 
-    // Configuration for established RTC connection
-    const connectionConf = {
-        iceServers: [
-            { urls: "stun:stun.1.google.com:19302" }
-        ]
-    };
-
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
     let videoElementAnotherUser: HTMLVideoElement;
@@ -57,122 +50,28 @@
 
     // Create Room by click on button to create room
     async function createRoom(ev: Event) {
-        // WebRTC channel connection
-        const webRTCInstance = new WebRTCConnection();
+        // Operation of creation new RTC room is at all performing by specjalized for that class instance
+        const connection = new WebRTCConnection(localDeviceStream);
+        const stream = await connection.createRoom();
 
-        // Firstly create RTC signaling channel
-        await webRTCInstance.createSignalingRoom();
-
-        // Connection instance
-        const connection = new RTCPeerConnection(connectionConf);
-
-        // Add video track to stream
-        localDeviceStream.getTracks().forEach(track => connection.addTrack(track, localDeviceStream));
-
-        // When .localDescription property has been setup on connection then send iceCandidate of this connection to signaling server channel in order to pass forward to another peers
-        connection.addEventListener("icecandidate", ({ candidate }) => {
-            if (candidate) {
-                console.log("ice candidate has been setup and send to signaling channel.\nIce candidate is: ", JSON.stringify(candidate))
-                webRTCInstance.signalingChannelSendIceCandidate(candidate);
-            }
-        });
-
-        // Add track from remote stream to preview of remote user
-        connection.addEventListener("track", ({ streams }) => {
-            userAnotherIsConnected = true;
-
-            setTimeout(() => {
-                videoElementAnotherUser.srcObject = streams[0];
-            })
-        });
-
-        // Listening for ice-candidate from another peer passing throught signaling channel
-        webRTCInstance.wssConnection.on("new-ice-candidate", (candidate: string) => {
-            candidate = JSON.parse(candidate);
-            userAnotherIsConnected = true;
-
-            connection.addIceCandidate()
-                .then(() => console.log("IceCandidate has been added to connection!"))
+        // Assign to html video element preview of another peer from connection
+        userAnotherIsConnected = connection.anotherUserIsConnected;
+        setTimeout(() => {
+            videoElementAnotherUser.srcObject = stream;
         })
-
-        // Listening for answer from signaling server and setup it as remoteDescription property on RTC connection 
-        webRTCInstance.wssConnection.on("answer", async (answer: string) => {
-            answer = JSON.parse(answer);
-            await connection.setRemoteDescription(answer as any)
-        });
-
-        // Setup offer and assign is to connection as localDescription property
-        const offer = await connection.createOffer();
-        await connection.setLocalDescription(offer);
-
-        // Send offer across signaling server
-        webRTCInstance.signalingChannelSendMessage(offer)
     }
 
+    // Join to room after click on "join to room" button
     async function joinToRoom(ev: Event) {
-        // WebRTC channel connection
-        const webRTCInstance = new WebRTCConnection();
+        // Operation of joining to existing RTC room connection (room which has been created prior time when we would like to join) is at all performing by specjalized for that class instance
+        const connection = new WebRTCConnection(localDeviceStream);
+        const stream = await connection.joinToRoom(roomID);
 
-        // Firstly join to signaling channel  
-        await webRTCInstance.signalingChannelEmitJoinToRoomRequest(roomID);
-
-        // Connection instance
-        const connection = new RTCPeerConnection(connectionConf);
-
-        // List with information about this user candidatures
-        let thisCandidates: string[] = [];
-
-        // Add video track to stream
-        localDeviceStream.getTracks()
-            .forEach(track => connection.addTrack(track, localDeviceStream));
-
-        // When .localDescription property has been setup on connection then send iceCandidate of this connection to signaling server channel in order to pass forward to another peers
-        connection.addEventListener("icecandidate", ({ candidate }) => {
-            if (candidate) {
-                console.log("ice candidate has been setup and send to signaling channel.\nIce candidate is: ", JSON.stringify(candidate))
-                thisCandidates.push(JSON.stringify(candidate));
-                webRTCInstance.signalingChannelSendIceCandidate(candidate);
-            }
+        // Assign to html video element preview of another peer from connection
+        userAnotherIsConnected = connection.anotherUserIsConnected;
+        setTimeout(() => {
+            videoElementAnotherUser.srcObject = stream;
         });
-
-        // Add track from remote stream to preview of remote user
-        connection.addEventListener("track", ({ streams }) => {
-            userAnotherIsConnected = true;
-
-            setTimeout(() => {
-                videoElementAnotherUser.srcObject = streams[0];
-            })
-        });
-
-        // Listening for ice-candidate from another peer passing throught signaling channel
-        webRTCInstance.wssConnection.on("new-ice-candidate", (candidate: string) => {
-            candidate = JSON.parse(candidate);
-            userAnotherIsConnected = true;
-
-            connection.addIceCandidate()
-                .then(() => console.log("IceCandidate has been added to connection!"))
-        })
-
-        // Get offer from signaling channel
-        const offer = await webRTCInstance.signalingChannelGetOffer();
-        await connection.setRemoteDescription(offer);
-
-        // Add remaining candidates from signaling room to this client RTC connection instance
-        (await webRTCInstance.getIceCandidatesFromRoom())
-            .forEach(candidateRawString => {
-                if (!thisCandidates.includes(candidateRawString)) {                    
-                    console.log("Remaining ICE candidate has been added to this client connection!")
-                    const candidate = JSON.parse(candidateRawString) as RTCIceCandidate;
-                    connection.addIceCandidate(candidate);
-                }
-            });
-
-        // Create answer and setup it as localDescription property
-        const answer = await connection.createAnswer();
-        await connection.setLocalDescription(answer);
-
-        // Send answer to signaling channel
-        webRTCInstance.signalingChannelSendMessage(answer);
     }
 
     // Test suite
