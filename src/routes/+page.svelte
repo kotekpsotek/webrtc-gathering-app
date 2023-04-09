@@ -16,6 +16,9 @@
     // Id from input to join to specified room id
     let roomID: string = ""; 
 
+    // Store class instance which handle RTC connections and devices using with RTC connection
+    let rtcConnection: WebRTCConnection; 
+
     // Things which will be performing on client side
     onMount(async () => {
         window.addEventListener("roomcreated", ({ detail }: any) => {
@@ -34,28 +37,22 @@
             signalingRoomId = "not specified";
         });
 
-        // Get stream and assign it to video element
-        localDeviceStream = await getStream();
-        videoElementPreview.srcObject = localDeviceStream;
-    });
-
-    async function getStream() {
-        // Get stream from camera
-        if (!navigator.mediaDevices) {
-            alert("Your camera and microphone isn't avaiable!")
-        }
+        // Initialize class to perform RTC operations such as: joining to existing RTC connection, making new RTC connection room to allow other peers joining to that room
+        rtcConnection = new WebRTCConnection(localDeviceStream);
         
-        return await navigator.mediaDevices.getUserMedia({ video: true });
-    } 
+        // Get stream and assign it to video element
+        localDeviceStream = await rtcConnection.getStream();
+        videoElementPreview.srcObject = localDeviceStream;
+        rtcConnection.deviceStream = localDeviceStream;
+    });
 
     // Create Room by click on button to create room
     async function createRoom(ev: Event) {
         // Operation of creation new RTC room is at all performing by specjalized for that class instance
-        const connection = new WebRTCConnection(localDeviceStream);
-        const stream = await connection.createRoom();
+        const stream = await rtcConnection.createRoom();
 
         // Assign to html video element preview of another peer from connection
-        userAnotherIsConnected = connection.anotherUserIsConnected;
+        userAnotherIsConnected = rtcConnection.anotherUserIsConnected;
         setTimeout(() => {
             videoElementAnotherUser.srcObject = stream;
         })
@@ -64,14 +61,25 @@
     // Join to room after click on "join to room" button
     async function joinToRoom(ev: Event) {
         // Operation of joining to existing RTC room connection (room which has been created prior time when we would like to join) is at all performing by specjalized for that class instance
-        const connection = new WebRTCConnection(localDeviceStream);
-        const stream = await connection.joinToRoom(roomID);
+        const stream = await rtcConnection.joinToRoom(roomID);
 
         // Assign to html video element preview of another peer from connection
-        userAnotherIsConnected = connection.anotherUserIsConnected;
+        userAnotherIsConnected = rtcConnection.anotherUserIsConnected;
         setTimeout(() => {
             videoElementAnotherUser.srcObject = stream;
         });
+    }
+
+    // Change camera status to on/off after click on button to change camera status (camera status will be changed on this device and for another connected with this devices in same room peers)
+    async function manageCameraOnAndOff(ev: Event) {
+        await rtcConnection.cameraOnOff(roomID);
+
+        if (rtcConnection.cameraTurnOnStatus == "on") {
+            videoElementPreview.srcObject = rtcConnection.deviceStream;
+        }
+
+        // Action required to launch Svelte Reactivity
+        rtcConnection = rtcConnection;
     }
 
     // Test suite
@@ -146,6 +154,8 @@
     <p>Your room id: </p>
     <p>{signalingRoomId}</p>
 </div>
+
+<button id="on-off-camera" on:click={manageCameraOnAndOff}>{rtcConnection?.cameraTurnOnStatus == "on" ? "Turn camera Off" : "Turn camera On"}</button>
 
 <div class="choose-bar">
     <div class="cl1">

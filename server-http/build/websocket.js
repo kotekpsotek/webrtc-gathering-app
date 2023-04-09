@@ -2,8 +2,27 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const crypto_1 = require("crypto");
 const redis_1 = require("redis");
-// Collecting candidates for specific room
-const roomCandidates = new Map();
+class RoomCandidates {
+    client;
+    roomId;
+    key;
+    constructor(client, roomId) {
+        // Assign to class instance params values passed by client
+        this.client = client;
+        this.roomId = roomId;
+        // Assign facilitation room key name for each class instance
+        this.key = `room-candidates:${this.roomId}`;
+    }
+    async getRoomCandidates() {
+        const candidatesLen = await this.client.LLEN(this.key);
+        if (candidatesLen == 0)
+            return [];
+        return await this.client.LRANGE(this.key, 0, candidatesLen);
+    }
+    async addNewCandidate(candidate) {
+        return await this.client.LPUSH(this.key, candidate);
+    }
+}
 async function main(socketInstance) {
     const redisClient = (0, redis_1.createClient)();
     await redisClient.connect();
@@ -68,22 +87,18 @@ async function main(socketInstance) {
             ;
         });
         // Listen for new candidates and send it to another peers "sitting in room"
-        socket.on("ice-candidate", (roomId, candidate) => {
+        socket.on("ice-candidate", async (roomId, candidate) => {
             if (roomId) {
-                // Collect candidate on candidates list for room
-                // Get old candidates from room
-                const otherRoomCandidates = roomCandidates.get(roomId) || [];
-                // Add new candidate to room candidates and update room candidates
-                otherRoomCandidates.push(candidate);
-                roomCandidates.set(roomId, otherRoomCandidates);
+                // Add new candidate to room
+                await new RoomCandidates(redisClient, roomId).addNewCandidate(candidate);
                 // Pass candidate forward to other peers in room
                 socket.in(roomId).emit("new-ice-candidate", candidate);
             }
             else
                 console.log("Room Identifier hasn't been attached to recived event!");
         });
-        socket.on("get-room-ice-candidates", (roomId, cb) => {
-            const candidatesFor = roomCandidates.get(roomId) || [];
+        socket.on("get-room-ice-candidates", async (roomId, cb) => {
+            const candidatesFor = await new RoomCandidates(redisClient, roomId).getRoomCandidates();
             console.log(candidatesFor);
             // Return list of candidates
             cb(candidatesFor);

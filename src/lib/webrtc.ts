@@ -95,6 +95,8 @@ export class WebRTCConnection {
     signalingChannelPortal: Socket;
     deviceStream: MediaStream;
     anotherUserIsConnected: boolean;
+    rtpUserSender?: RTCRtpSender;
+    cameraTurnOnStatus: "on" | "off";
 
     constructor(localDeviceStream: MediaStream) {
         // WebRTC connection instance
@@ -111,6 +113,8 @@ export class WebRTCConnection {
         this.deviceStream = localDeviceStream;
         // Assign property which determine whether other user is connected with our peer
         this.anotherUserIsConnected = false;
+        // Determine whether camera is turned on or not
+        this.cameraTurnOnStatus = "on";
     }
 
     /** Creating room for calls */
@@ -121,7 +125,7 @@ export class WebRTCConnection {
             await this.signalingChannel.createSignalingRoom();
     
             // Add video track to stream
-            this.deviceStream.getTracks().forEach(track => this.rtcConnection.addTrack(track, this.deviceStream));
+            this.deviceStream.getTracks().forEach(track => this.rtpUserSender = this.rtcConnection.addTrack(track, this.deviceStream));
     
             // When .localDescription property has been setup on connection then send iceCandidate of this connection to signaling server channel in order to pass forward to another peers
             this.rtcConnection.addEventListener("icecandidate", ({ candidate }) => {
@@ -161,7 +165,7 @@ export class WebRTCConnection {
     
             // Add video track to stream
             this.deviceStream.getTracks()
-                .forEach(track => this.rtcConnection.addTrack(track, this.deviceStream));
+                .forEach(track => this.rtpUserSender = this.rtcConnection.addTrack(track, this.deviceStream));
     
             // When .localDescription property has been setup on connection then send iceCandidate of this connection to signaling server channel in order to pass forward to another peers
             this.rtcConnection.addEventListener("icecandidate", ({ candidate }) => {
@@ -197,6 +201,59 @@ export class WebRTCConnection {
             this.signalingChannel.signalingChannelSendMessage(answer);
         });
     }
+
+    /** Turn on/off camera on localDevice and for connected with this device another peers in same room */
+    async cameraOnOff(roomId: RoomIdentifier) {      
+        let stat = this.cameraTurnOnStatus; // :"on" or "off" always one from both
+
+        if (stat == "on") { // Turn Off camera
+            // Stop video camera from playing videos
+            this.deviceStream.getTracks()[0].stop();
+
+            // Remove stream from RTC connection
+            if (this.rtpUserSender) {
+                this.rtcConnection.removeTrack(this.rtpUserSender);
+            } 
+
+            // Set camera turned on status as "off" so camera isn't recording
+            this.cameraTurnOnStatus = "off";
+
+            // Emit event to user which is camera owner in local device call enviroment (browswer)
+            const e = new CustomEvent("camera-status", { detail: "off" });
+            window.dispatchEvent(e);
+
+            // Emit to other room clients that user change camera status to off
+            this.signalingChannelPortal.emit("changed-camera-status", roomId, "off");
+        } 
+        else { // Turn On camera
+            // Turn camera on again
+            this.deviceStream = await this.getStream();
+            
+            // Add camera again to RTC streem connection
+            this.deviceStream.getTracks()
+                .forEach(track => this.rtpUserSender = this.rtcConnection.addTrack(track, this.deviceStream))
+
+            // Set camera turned on status as "on" so camera is now recording
+            this.cameraTurnOnStatus = "on";
+
+            // Emit event to user which is camera owner in local device call enviroment (browswer)
+            const e = new CustomEvent("camera-status", { detail: "on" });
+            window.dispatchEvent(e);
+
+            // Emit to other room clients that user change camera status to on
+            this.signalingChannelPortal.emit("changed-camera-status", roomId, "on");
+        }
+    }
+
+    /** Get access to stream from user mediaDevice camera */
+    async getStream() {
+        // Get stream from camera
+        if (!navigator.mediaDevices) {
+            alert("Your camera and microphone isn't avaiable!")
+        }
+        
+        return await navigator.mediaDevices.getUserMedia({ video: true });
+    } 
 
     /** Handle events which are same and are using in both cases: when user creating new RTC room, when user is joining to existing RTC room */
     private universalEventsHandler(promiseResolveFn: (result: any) => any) {
