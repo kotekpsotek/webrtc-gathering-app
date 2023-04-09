@@ -127,13 +127,17 @@ export default async function main(socketInstance: Server) {
             else console.log("Room Identifier hasn't been attached to recived event!")
         });
 
-
+        // Send to same user which emits this event list with other canidates gathered in same room
         socket.on("get-room-ice-candidates", async (roomId: string, cb) => {
             const candidatesFor = await new RoomCandidates(redisClient as any, roomId).getRoomCandidates();
-            console.log(candidatesFor)
 
             // Return list of candidates
             cb(candidatesFor)
+        });
+
+        // Change camera status for other peers connected in same room by forwarding same event to another websocket peers gathered in same room
+        socket.on("changed-camera-status", (roomId: string, emittingUser: string, status: "on" | "off") => {
+            socket.in(roomId).emit("changed-camera-status", emittingUser, status);
         });
     })
 }

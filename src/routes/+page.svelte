@@ -1,11 +1,12 @@
 <script lang="ts" async>
     import { onMount } from "svelte";
     import { WebRTCConnection } from "$lib/webrtc";
+    import { userData } from "$lib/storages";
 
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
     let videoElementAnotherUser: HTMLVideoElement;
-    let signalingRoomId: string = "not specified";
+    let signalingRoomId: string = "not specified"; // Room id which should be used with all API stuff
 
     // Whether Another user is connected with this device peer
     let userAnotherIsConnected = false;
@@ -16,7 +17,7 @@
     // Stream from local device
     let localDeviceStream: MediaStream;
 
-    // Id from input to join to specified room id
+    // Id from input to join to specified room id (only for using to bind value from input to specify room identifier to which user would like to join)
     let roomID: string = ""; 
 
     // Store class instance which handle RTC connections and devices using with RTC connection
@@ -42,6 +43,13 @@
 
         // Initialize class to perform RTC operations such as: joining to existing RTC connection, making new RTC connection room to allow other peers joining to that room
         rtcConnection = new WebRTCConnection(localDeviceStream);
+
+        // Listen for changes in camera status for change performed by another user then this device user 
+        rtcConnection.signalingChannelPortal.on("changed-camera-status", (byUserId: string, status: "on" | "off") => {
+            if ($userData.userId != byUserId) {
+                anotherUserCameraStatus = status;
+            }
+        });
         
         // Get stream and assign it to video element
         localDeviceStream = await rtcConnection.getStream();
@@ -58,7 +66,7 @@
         userAnotherIsConnected = rtcConnection.anotherUserIsConnected;
         setTimeout(() => {
             videoElementAnotherUser.srcObject = stream;
-        })
+        });
     }
 
     // Join to room after click on "join to room" button
@@ -75,7 +83,7 @@
 
     // Change camera status to on/off after click on button to change camera status (camera status will be changed on this device and for another connected with this devices in same room peers)
     async function manageCameraOnAndOff(ev: Event) {
-        await rtcConnection.cameraOnOff(roomID);
+        await rtcConnection.cameraOnOff(signalingRoomId);
 
         if (rtcConnection.cameraTurnOnStatus == "on") {
             videoElementPreview.srcObject = rtcConnection.deviceStream;
@@ -84,50 +92,6 @@
         // Action required to launch Svelte Reactivity
         rtcConnection = rtcConnection;
     }
-
-    // Test suite
-    /* onMount(() => {
-        // Test #1
-        const cn1 = new RTCPeerConnection();
-        const cn2 = new RTCPeerConnection();
-    
-        cn2.addEventListener("connectionstatechange", (ev) => {
-            console.log(cn2.connectionState)
-        })
-
-        cn1.addEventListener("icecandidate", ({ candidate }) => {
-            if (candidate) {
-                cn2.addIceCandidate(candidate)
-            }
-        });
-    
-        cn2.addEventListener("icecandidate", ({ candidate }) => {
-            if (candidate) {
-                cn1.addIceCandidate(candidate)
-            }
-        });
-    
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(localStream => {
-                videoElementPreview.srcObject = localStream;
-    
-                localStream.getTracks().forEach(track => {
-                    cn1.addTrack(track);
-                });
-    
-                return cn1.createOffer();
-            })
-            .then(offer => cn1.setLocalDescription(new RTCSessionDescription(offer)))
-            .then(() => cn2.setRemoteDescription(cn1.localDescription as any))
-            .then(() => cn2.createAnswer())
-            .then(answer => cn2.setLocalDescription(new RTCSessionDescription(answer)))
-            .then(() => cn1.setRemoteDescription(cn2.localDescription as any))
-
-            cn2.ontrack = ({ streams }) => {
-                videoElementAnotherUser.srcObject = streams[0]
-                console.log("track recived")
-            }
-    }) */
 </script>
 
 <div class="videos">
@@ -140,11 +104,17 @@
     </div>
     <div class="another-user-view" data-connected="false">
         {#if userAnotherIsConnected}
-            <div class="label another-user-stream">
-                <p>Another user preview</p>
-            </div>
-            <!-- svelte-ignore a11y-media-has-caption -->
-            <video autoplay src="" bind:this={videoElementAnotherUser}></video>
+            {#if anotherUserCameraStatus == "on"}
+                <div class="label another-user-stream">
+                    <p>Another user preview</p>
+                </div>
+                <!-- svelte-ignore a11y-media-has-caption -->
+                <video autoplay src="" bind:this={videoElementAnotherUser}></video>
+            {:else}
+                <div class="user-camera-off">
+                    <p>User camera is turned off</p>
+                </div>
+            {/if}
         {:else}
             <div class="not-connected">
                 <p>No one user is connected!</p>

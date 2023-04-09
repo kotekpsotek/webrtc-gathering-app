@@ -229,9 +229,6 @@ export class WebRTCConnection {
             // Emit event to user which is camera owner in local device call enviroment (browswer)
             const e = new CustomEvent("camera-status", { detail: "off" });
             window.dispatchEvent(e);
-
-            // Emit to other room clients that user change camera status to off
-            this.signalingChannelPortal.emit("changed-camera-status", roomId, "off");
         } 
         else { // Turn On camera
             // Turn camera on again
@@ -247,10 +244,17 @@ export class WebRTCConnection {
             // Emit event to user which is camera owner in local device call enviroment (browswer)
             const e = new CustomEvent("camera-status", { detail: "on" });
             window.dispatchEvent(e);
-
-            // Emit to other room clients that user change camera status to on
-            this.signalingChannelPortal.emit("changed-camera-status", roomId, "on");
         }
+
+        // Emit to other room clients that user change camera status to off/on
+        userData.update(data => { // Get this client id from Svelte storage
+            const uuid = data.userId;
+
+            // Emit destination event
+            this.signalingChannelPortal.emit("changed-camera-status", roomId, uuid, this.cameraTurnOnStatus);
+
+            return data;
+        });
     }
 
     /** Get access to stream from user mediaDevice camera */
