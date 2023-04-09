@@ -1,4 +1,5 @@
 import { io, type Socket } from "socket.io-client";
+import { userData } from "$lib/storages";
 
 type RoomIdentifier = string;
 class WebRTCSignalingChannel {
@@ -13,7 +14,7 @@ class WebRTCSignalingChannel {
 
     public async createSignalingRoom(): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.wssConnection.emit("create-room-demand", (roomId: string) => {
+            this.wssConnection.emit("create-room-demand", (roomId: string, uuid: string) => {
                 // Assign room identifier and success room creation status to class instance properties
                 this.roomId = roomId;
                 this.connectedToRoom = true;
@@ -21,6 +22,9 @@ class WebRTCSignalingChannel {
                 // Emit global event that room has been created. To "detail" property is assigned created room identifier
                 const event = new CustomEvent("roomcreated", { detail: roomId });
                 window.dispatchEvent(event);
+
+                // Set user UUID obtained from server side
+                userData.set({ userId: uuid });
 
                 // Return success as a promise worked result
                 resolve()
@@ -47,16 +51,20 @@ class WebRTCSignalingChannel {
 
     public async signalingChannelEmitJoinToRoomRequest(roomId: RoomIdentifier): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.wssConnection.emit("join-to-room-demand", roomId, (result: boolean) => {
+            this.wssConnection.emit("join-to-room-demand", roomId, (result: boolean, uuid?: string ) => {
                 this.connectedToRoom = result;
 
                 // Do appropriate action to result of joining to room
                 if (result) {
                     this.roomId = roomId;
+                    
+                    // Set user UUID obtained from server side
+                    userData.set({ userId: (uuid as any) as string }); // in such environment conditions uuid is presented always
 
                     // Emit that user join to room with roomId to which user join assigned as room identifier
                     const e = new CustomEvent("joined-to-room", { detail: roomId });
                     window.dispatchEvent(e);
+
 
                     // Emit success from promise
                     resolve(undefined);
@@ -253,7 +261,7 @@ export class WebRTCConnection {
         }
         
         return await navigator.mediaDevices.getUserMedia({ video: true });
-    } 
+    }
 
     /** Handle events which are same and are using in both cases: when user creating new RTC room, when user is joining to existing RTC room */
     private universalEventsHandler(promiseResolveFn: (result: any) => any) {

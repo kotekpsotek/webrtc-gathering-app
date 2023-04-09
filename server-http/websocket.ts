@@ -31,6 +31,11 @@ class RoomCandidates {
     }
 }
 
+/** Generate unique user identifier v4 (uuidv4) for each user whose create new room or join to existing room */
+function generateUserId() {
+    return randomUUID();
+}
+
 export default async function main(socketInstance: Server) {
     const redisClient = createClient();
     await redisClient.connect();
@@ -41,6 +46,9 @@ export default async function main(socketInstance: Server) {
             // Generated room id
             const roomId = `crum:${randomUUID()}`;
 
+            // Generate UUID
+            const uuid = generateUserId();
+
             // Create room into database
             await redisClient.HSET(`room:${roomId}`, "roomId", roomId);
 
@@ -48,7 +56,7 @@ export default async function main(socketInstance: Server) {
             await socket.join(roomId);
             
             // Send back to client it room id
-            cb(roomId);
+            cb(roomId, uuid);
         });
 
         // Join socket to room specified by sended with demand room id. Send back to client join outcome (whether client join to signal channel)
@@ -56,7 +64,12 @@ export default async function main(socketInstance: Server) {
             // Join only to room which exist (room which has been created prior using demand by call websocket event: "create-room-demand")
             if (await redisClient.exists(`room:${roomId}`)) {
                 await socket.join(roomId);
-                success(true);
+
+                // Generate UUID
+                const uuid = generateUserId();
+
+                // Return callback with result of operation and user id
+                success(true, uuid);
             }
             else success(false);
         });

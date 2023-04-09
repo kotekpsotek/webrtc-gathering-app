@@ -10,6 +10,9 @@
     // Whether Another user is connected with this device peer
     let userAnotherIsConnected = false;
 
+    // Determine whether another camera is turned on
+    let anotherUserCameraStatus: "on" | "off" = "on";
+
     // Stream from local device
     let localDeviceStream: MediaStream;
 
