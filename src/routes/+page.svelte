@@ -47,7 +47,28 @@
         // Listen for changes in camera status for change performed by another user then this device user 
         rtcConnection.signalingChannelPortal.on("changed-camera-status", (byUserId: string, status: "on" | "off") => {
             if ($userData.userId != byUserId) {
+                // Assign other user camera status to global state
                 anotherUserCameraStatus = status;
+                
+                // Timeout is to allow Svelte reactivity to hide or show preview of another user html video element 
+                setTimeout(() => {
+                    // When camera is again on after turn it off by another user then assign to html preview video element another user preview
+                    if (status == "on") {
+                        const fstReciver = rtcConnection.rtcConnection.getReceivers().length ? rtcConnection.rtcConnection.getReceivers()[0] : null; // get first receiver from RTC connection recivers list
+
+                        if (fstReciver) {
+                            // Create stream and obtain track from receiver
+                            const stream = new MediaStream();
+                            const reciverTrack = fstReciver.track;
+    
+                            // Add receiver track to stream
+                            stream.addTrack(reciverTrack);
+    
+                            // Assign stream to html video preview element
+                            videoElementAnotherUser.srcObject = stream
+                        }
+                    } 
+                })
             }
         });
         
@@ -83,8 +104,10 @@
 
     // Change camera status to on/off after click on button to change camera status (camera status will be changed on this device and for another connected with this devices in same room peers)
     async function manageCameraOnAndOff(ev: Event) {
+        // Turn camera on/off in same device and for other RTC connection peers
         await rtcConnection.cameraOnOff(signalingRoomId);
 
+        // Assign camera preview from this device to this device camera preview
         if (rtcConnection.cameraTurnOnStatus == "on") {
             videoElementPreview.srcObject = rtcConnection.deviceStream;
         }

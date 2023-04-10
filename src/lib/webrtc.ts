@@ -215,13 +215,14 @@ export class WebRTCConnection {
         let stat = this.cameraTurnOnStatus; // :"on" or "off" always one from both
 
         if (stat == "on") { // Turn Off camera
+            // After actions from this step other users without removing html video another user preview element will be see frozen last transmited video frame from this device
             // Stop video camera from playing videos
             this.deviceStream.getTracks()[0].stop();
 
             // Remove stream from RTC connection
             if (this.rtpUserSender) {
                 this.rtcConnection.removeTrack(this.rtpUserSender);
-            } 
+            }
 
             // Set camera turned on status as "off" so camera isn't recording
             this.cameraTurnOnStatus = "off";
@@ -235,8 +236,12 @@ export class WebRTCConnection {
             this.deviceStream = await this.getStream();
             
             // Add camera again to RTC streem connection
-            this.deviceStream.getTracks()
-                .forEach(track => this.rtpUserSender = this.rtcConnection.addTrack(track, this.deviceStream))
+            const senders = this.rtcConnection.getSenders();
+            if (senders.length) {
+                const fstSender = senders[0];
+                this.deviceStream.getTracks()
+                    .forEach(async track => await fstSender.replaceTrack(track))
+            }
 
             // Set camera turned on status as "on" so camera is now recording
             this.cameraTurnOnStatus = "on";
