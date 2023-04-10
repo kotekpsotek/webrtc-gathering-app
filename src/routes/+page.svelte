@@ -71,6 +71,17 @@
                 })
             }
         });
+
+        // Listen when other user leave connections room
+        rtcConnection.signalingChannelPortal.on("user-leave-room", (uuid: string) => {
+            // Reset variables with states
+            userAnotherIsConnected = false;
+            anotherUserCameraStatus = "on";
+            signalingRoomId = "not specified"
+
+            // Create application visual aspects for leaving user event
+            alert(`User ${uuid} leave connection room!`);
+        });
         
         // Get stream and assign it to video element
         localDeviceStream = await rtcConnection.getStream();
@@ -115,6 +126,12 @@
         // Action required to launch Svelte Reactivity
         rtcConnection = rtcConnection;
     }
+
+    // Leave room to which user has been connected
+    async function leaveUserFromRTCConnection(ev: Event) {
+        // Emit function to handle leaving user from connection room
+        rtcConnection.leaveConnection(signalingRoomId);
+    }
 </script>
 
 <div class="videos">
@@ -152,6 +169,9 @@
 </div>
 
 <button id="on-off-camera" on:click={manageCameraOnAndOff}>{rtcConnection?.cameraTurnOnStatus == "on" ? "Turn camera Off" : "Turn camera On"}</button>
+{#if userAnotherIsConnected}
+    <button id="leve-from-room" on:click={leaveUserFromRTCConnection}>Leave room</button>
+{/if}
 
 <div class="choose-bar">
     <div class="cl1">

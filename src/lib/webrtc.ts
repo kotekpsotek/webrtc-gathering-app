@@ -210,6 +210,23 @@ export class WebRTCConnection {
         });
     }
 
+    /** Leave this device user from room to which it has been connected */
+    leaveConnection(roomId: RoomIdentifier) {
+        userData.update(data => {
+            // Emit event to other room clients that this client leave room
+            this.signalingChannelPortal.emit("user-leave-room", roomId, data.userId, (success: boolean) => {
+                // Disconnect user only when it is allowed by server side
+                if (success) {
+                    // Close RTC connection
+                    this.rtcConnection.close();
+                }
+            });
+            
+            // Return not updated user data
+            return data;
+        })
+    }
+
     /** Turn on/off camera on localDevice and for connected with this device another peers in same room */
     async cameraOnOff(roomId: RoomIdentifier) {      
         let stat = this.cameraTurnOnStatus; // :"on" or "off" always one from both
@@ -289,6 +306,11 @@ export class WebRTCConnection {
 
             this.rtcConnection.addIceCandidate()
                 .then(() => console.log("IceCandidate has been added to connection!"))
+        })
+
+        // Listen that other user is leaving room
+        this.signalingChannelPortal.on("user-leave-room", (uuid: string) => {
+            this.anotherUserIsConnected = false;
         })
     }
 }
