@@ -24,7 +24,10 @@ class WebRTCSignalingChannel {
                 window.dispatchEvent(event);
 
                 // Set user UUID obtained from server side
-                userData.set({ userId: uuid });
+                userData.update(userData => {
+                    userData.userId = uuid
+                    return userData;
+                });
 
                 // Return success as a promise worked result
                 resolve()
@@ -37,7 +40,10 @@ class WebRTCSignalingChannel {
     }
 
     public signalingChannelSendIceCandidate(candidate: RTCIceCandidate) {
-        this.wssConnection.emit("ice-candidate", this.roomId, JSON.stringify(candidate));
+        userData.update(uData => {
+            this.wssConnection.emit("ice-candidate", this.roomId, uData.userId, JSON.stringify(candidate));
+            return uData;
+        })
     }
 
     /** Return promise with array arised by candidates from room to which user is joining */
@@ -59,7 +65,11 @@ class WebRTCSignalingChannel {
                     this.roomId = roomId;
                     
                     // Set user UUID obtained from server side
-                    userData.set({ userId: (uuid as any) as string }); // in such environment conditions uuid is presented always
+                    userData.update(userData => {
+                        userData.userId = uuid as string;
+                        return userData;
+                    });
+                    // in such environment conditions uuid is presented always
 
                     // Emit that user join to room with roomId to which user join assigned as room identifier
                     const e = new CustomEvent("joined-to-room", { detail: roomId });
@@ -138,7 +148,14 @@ export class WebRTCConnection {
             // When .localDescription property has been setup on connection then send iceCandidate of this connection to signaling server channel in order to pass forward to another peers
             this.rtcConnection.addEventListener("icecandidate", ({ candidate }) => {
                 if (candidate) {
-                    console.log("ice candidate has been setup and send to signaling channel.\nIce candidate is: ", JSON.stringify(candidate))
+                    const pCandidate = JSON.stringify(candidate);
+
+                    // Assign user candidate object to user data Svelte storage
+                    userData.update(data => {
+                        data.userIceCandidate = pCandidate;
+                        return data;
+                    });
+
                     this.signalingChannel.signalingChannelSendIceCandidate(candidate);
                 }
             });
@@ -178,8 +195,15 @@ export class WebRTCConnection {
             // When .localDescription property has been setup on connection then send iceCandidate of this connection to signaling server channel in order to pass forward to another peers
             this.rtcConnection.addEventListener("icecandidate", ({ candidate }) => {
                 if (candidate) {
-                    console.log("ice candidate has been setup and send to signaling channel.\nIce candidate is: ", JSON.stringify(candidate))
-                    thisCandidates.push(JSON.stringify(candidate));
+                    const pCandidate = JSON.stringify(candidate);
+
+                    // Assign user candidate object to user data Svelte storage
+                    userData.update(data => {
+                        data.userIceCandidate = pCandidate;
+                        return data;
+                    });
+                    
+                    thisCandidates.push(pCandidate);
                     this.signalingChannel.signalingChannelSendIceCandidate(candidate);
                 }
             });

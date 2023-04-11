@@ -22,12 +22,49 @@ class RoomCandidates {
         const candidatesLen = await this.client.LLEN(this.key);
         
         if (candidatesLen == 0) return [];
+
+        // Return candidates list from database without user id to which each candidate object belongs to
+        const candidatesList = await this.client.LRANGE(this.key, 0, candidatesLen); // Non prepatred candidates list obtained from database
+        let readyList: string[] = []; // Prepared candidates list returning from this function
+        for (let id = 0; id < candidatesLen; id++) {
+            let candidateSelected = candidatesList[id];
+
+            // Delete user identifier from candidate, from db key
+            const cSp = candidateSelected.split(":");
+            cSp.splice(0, 1); // remove user id from candidate schema
+
+            // Assign to returning candidate list new prepared candidate shema
+            candidateSelected = cSp.join(":").trim();
+            readyList.push(candidateSelected);
+        }
         
-        return await this.client.LRANGE(this.key, 0, candidatesLen)
+        return readyList;
     }
 
-    async addNewCandidate(candidate: string): Promise<CandidatesLenFromRoom> {
-        return await this.client.LPUSH(this.key, candidate)
+    async addNewCandidate(candidate: string, userId: string): Promise<CandidatesLenFromRoom> {
+        const candidateKey = `${userId}:${candidate}`;
+        return await this.client.LPUSH(this.key, candidateKey)
+    }
+
+    /** Remove one ice candidate specified by client Identifier datas from database key */
+    async removeIceCandidate(userId: string) {
+        const candidatesLen = await this.client.LLEN(this.key);
+        const candidatesList = await this.client.LRANGE(this.key, 0, candidatesLen); // Candidates list obtained from database
+
+        const readyCandidates: string[] = [];
+        for (const candidate of candidatesList) {
+            const userCandidateId = candidate.split(":")[0];
+
+            if (userCandidateId != userId) readyCandidates.push(candidate);
+        }
+
+        await this.client.LPUSH(this.key, readyCandidates);
+    }
+
+    /** Remove whole candidates key (redis database) with all its datas */
+    async removeCandidatesKey(): Promise<boolean> {
+        const delCount = await this.client.DEL(this.key);
+        return delCount > 0;
     }
 }
 
@@ -116,10 +153,10 @@ export default async function main(socketInstance: Server) {
         });
 
         // Listen for new candidates and send it to another peers "sitting in room"
-        socket.on("ice-candidate", async (roomId: string, candidate: string) => {
+        socket.on("ice-candidate", async (roomId: string, userId: string, candidate: string) => {
             if (roomId) {
                 // Add new candidate to room
-                await new RoomCandidates(redisClient as any, roomId).addNewCandidate(candidate);
+                await new RoomCandidates(redisClient as any, roomId).addNewCandidate(candidate, userId);
 
                 // Pass candidate forward to other peers in room
                 socket.in(roomId).emit("new-ice-candidate", candidate)
