@@ -131,6 +131,8 @@
     async function leaveUserFromRTCConnection(ev: Event) {
         // Emit function to handle leaving user from connection room
         rtcConnection.leaveConnection(signalingRoomId);
+        // Whether another user is connected with us
+        userAnotherIsConnected = false;
     }
 </script>
 
