@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { WebRTCConnection } from "$lib/webrtc";
     import { userData } from "$lib/storages";
+    import { VideoFilled, VideoOffFilled, PhoneOffFilled, PhoneFilled, PhoneVoiceFilled } from "carbon-icons-svelte"; // Import icons from great icons library
 
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
@@ -136,54 +137,76 @@
     }
 </script>
 
-<div class="videos">
-    <div class="your-view">
-        <div class="label your-stream">
-            <p>Your preview</p>
-        </div>
-        <!-- svelte-ignore a11y-media-has-caption -->
-        <video autoplay src="" bind:this={videoElementPreview}></video>
+<div class="room-actions">
+    <div class="room-id">
+        <p>Your room id: </p>
+        <p id="source">{signalingRoomId}</p>
     </div>
-    <div class="another-user-view" data-connected="false">
-        {#if userAnotherIsConnected}
-            {#if anotherUserCameraStatus == "on"}
-                <div class="label another-user-stream">
-                    <p>Another user preview</p>
-                </div>
-                <!-- svelte-ignore a11y-media-has-caption -->
-                <video autoplay src="" bind:this={videoElementAnotherUser}></video>
+
+    <div class="videos">
+        <div class="your-view">
+            <div class="label your-stream">
+                <p>Your preview</p>
+            </div>
+            <!-- svelte-ignore a11y-media-has-caption -->
+            <video autoplay src="" bind:this={videoElementPreview}></video>
+        </div>
+        <div class="another-user-view" data-connected="false">
+            {#if userAnotherIsConnected}
+                {#if anotherUserCameraStatus == "on"}
+                    <div class="label another-user-stream">
+                        <p>Another user preview</p>
+                    </div>
+                    <!-- svelte-ignore a11y-media-has-caption -->
+                    <video autoplay src="" bind:this={videoElementAnotherUser}></video>
+                {:else}
+                    <div class="user-camera-off">
+                        <p>User camera is turned off</p>
+                    </div>
+                {/if}
             {:else}
-                <div class="user-camera-off">
-                    <p>User camera is turned off</p>
+                <div class="not-connected">
+                    <p>No one user is connected!</p>
                 </div>
             {/if}
-        {:else}
-            <div class="not-connected">
-                <p>No one user is connected!</p>
-            </div>
-        {/if}
+        </div>
+    </div>
+
+    <div class="actions">
+        <div class="zone">
+            <button id="on-off-camera" on:click={manageCameraOnAndOff} class:turned-on={rtcConnection?.cameraTurnOnStatus == "on"}>
+                {#if rtcConnection?.cameraTurnOnStatus == "on"}
+                    <VideoOffFilled size={24} fill="white"/>
+                {:else if rtcConnection?.cameraTurnOnStatus == "off"}
+                    <VideoFilled size={24} fill="white"/>
+                {/if}
+            </button>
+            {#if userAnotherIsConnected}
+                <button id="leave-from-room" on:click={leaveUserFromRTCConnection}>
+                    <PhoneOffFilled size={24} fill="white"/>
+                </button>
+            {/if}
+        </div>
     </div>
 </div>
 
-<div class="room-id">
-    <p>Your room id: </p>
-    <p>{signalingRoomId}</p>
-</div>
-
-<button id="on-off-camera" on:click={manageCameraOnAndOff}>{rtcConnection?.cameraTurnOnStatus == "on" ? "Turn camera Off" : "Turn camera On"}</button>
-{#if userAnotherIsConnected}
-    <button id="leve-from-room" on:click={leaveUserFromRTCConnection}>Leave room</button>
+{#if !userAnotherIsConnected}
+    <div class="choose-bar">
+        <h2>Connection manipulation stripe:</h2>
+        <div class="cl1">
+            <input type="text" placeholder="ROOM ID" bind:value={roomID}>
+            <button on:click={joinToRoom}>
+                <PhoneFilled size={20} fill="white"/>
+            </button>
+        </div>
+        <div class="cl2">
+            <button on:click={createRoom}>
+                Create Connection
+                <PhoneVoiceFilled size={20} fill="white"/>
+            </button>
+        </div>
+    </div>
 {/if}
-
-<div class="choose-bar">
-    <div class="cl1">
-        <input type="text" placeholder="ROOM ID" bind:value={roomID}>
-        <button on:click={joinToRoom}>Join to room</button>
-    </div>
-    <div class="cl2">
-        <button on:click={createRoom}>Create room</button>
-    </div>
-</div>
 
 <style>
     * {
@@ -191,7 +214,43 @@
         padding: 0px;
     }
 
+    button {
+        width: fit-content;
+        border: none;
+        outline: none;
+        background-color: transparent;
+        font-family: 'Roboto', sans-serif;
+        font-size: 16px;
+    }
+
+    .room-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-top: 5px;
+    }
+
+    /* Room identifier */
+    .room-id {
+        height: 25px;
+        width: fit-content;
+        display: flex;
+        align-items: center;
+        padding: 5px;
+        gap: 5px;
+        background-color: rgb(50, 50, 50);
+        border: solid 1px rgb(60, 60, 60);
+        border-radius: 4px;
+        color: white;
+    }
+
+    .room-id #source {
+        color: red;
+    }
+
+    /* Videos container and videos elements */
     .videos {
+        margin-bottom: 5px;
         display: grid;
         grid-template-columns: 50% 50%;
         grid-template-rows: auto;
@@ -239,12 +298,105 @@
         color: white;
     }
 
-    .room-id, .choose-bar {
-        margin-top: 10px;
+    /* Bar with buttons: turn off/on camera, leave with connections room (when any other user is connected with room) */
+    div.actions {
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .room-id {
+    div.zone {
+        width: 250px;
+        padding: 5px;
         display: flex;
+        align-items: center;
+        justify-content: center;
+        column-gap: 5px;
+        background-color: rgb(50, 50, 50);
+        border: solid 1px rgb(60, 60, 60);
+        border-radius: 4px;
+    }
+
+    div.zone > button {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: solid 2px white;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    button#on-off-camera {
+        background-color: rgb(113, 113, 113);
+    }
+
+    button#on-off-camera.turned-on {
+        background-color: red;
+    }
+
+    button#leave-from-room {
+        background-color: black;
+    }
+
+    div.choose-bar {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
         gap: 5px;
+    }
+
+    div.choose-bar > h2 {
+        color: white;
+    }
+
+    :is(.cl1, .cl2) {
+        height: 35px;
+    }
+
+    .cl1 {
+        margin-top: 5px;
+        display: flex;
+    }
+
+    .cl1 input {
+        color: white;
+        padding: 5px;
+        border: none;
+        outline: none;
+        background-color: rgb(50, 50, 50);
+        border: solid 1px rgb(60, 60, 60);
+        border-right: none;
+        border-radius: 4px;
+        border-top-right-radius: 0px;
+        border-bottom-right-radius: 0px;
+    }
+
+    .cl1 button {
+        width: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(50, 50, 50, 0.811);
+        border: solid 1px rgb(60, 60, 60);
+        border-left: none;
+        border-top-right-radius: 5px;
+        border-bottom-right-radius: 5px;
+        cursor: pointer;
+    }
+
+    .cl2 button {
+        padding: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        column-gap: 5px;
+        border-radius: 4px;
+        background-color: green;
+        border: solid .5px white;
+        color: white;
+        cursor: pointer;
     }
 </style>
