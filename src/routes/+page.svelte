@@ -3,6 +3,7 @@
     import { WebRTCConnection } from "$lib/webrtc";
     import { userData } from "$lib/storages";
     import { VideoFilled, VideoOffFilled, PhoneOffFilled, PhoneFilled, PhoneVoiceFilled } from "carbon-icons-svelte"; // Import icons from great icons library
+    import Chat from "$lib/fragments/Chat.svelte";
 
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
@@ -21,8 +22,11 @@
     // Id from input to join to specified room id (only for using to bind value from input to specify room identifier to which user would like to join)
     let roomID: string = ""; 
 
+    // Message content from user to required send it
+    let valueToSendMessageOnChat: string;
+
     // Store class instance which handle RTC connections and devices using with RTC connection
-    let rtcConnection: WebRTCConnection; 
+    let rtcConnection: WebRTCConnection;
 
     // Things which will be performing on client side
     onMount(async () => {
@@ -206,6 +210,8 @@
             </button>
         </div>
     </div>
+{:else}
+    <Chat bind:value={valueToSendMessageOnChat}/>
 {/if}
 
 <style>
