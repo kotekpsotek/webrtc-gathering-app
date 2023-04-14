@@ -118,11 +118,7 @@ export class WebRTCConnection {
 
     constructor(localDeviceStream: MediaStream) {
         // WebRTC connection instance
-        this.rtcConnection = new RTCPeerConnection({
-            iceServers: [
-                { urls: "stun:stun.1.google.com:19302" }
-            ]
-        });
+        this.rtcConnection = this.createRTCConnection();
         // Signaling channel class instance (to get methods wrapped over signaling channel)
         this.signalingChannel = new WebRTCSignalingChannel();
         // Instance of websocket connection to simply interact with signaling channel (to get access to websocket methods from signaling channel such as: event listeners, event emitters etc...)
@@ -133,6 +129,15 @@ export class WebRTCConnection {
         this.anotherUserIsConnected = false;
         // Determine whether camera is turned on or not
         this.cameraTurnOnStatus = "on";
+    }
+
+    /** Create RTC connection for class usage */
+    private createRTCConnection() {
+        return new RTCPeerConnection({
+            iceServers: [
+                { urls: "stun:stun.1.google.com:19302" }
+            ]
+        });
     }
 
     /** Creating room for calls */
@@ -243,6 +248,9 @@ export class WebRTCConnection {
                 if (success) {
                     // Close RTC connection
                     this.rtcConnection.close();
+
+                    // Assign new RTC connection
+                    this.rtcConnection = this.createRTCConnection();
                 }
             });
             
@@ -335,6 +343,10 @@ export class WebRTCConnection {
         // Listen that other user is leaving room
         this.signalingChannelPortal.on("user-leave-room", (uuid: string) => {
             this.anotherUserIsConnected = false;
-        })
+
+            // Close existsing rtc connection and assign new to same class variable
+            this.rtcConnection.close();
+            this.rtcConnection = this.createRTCConnection();
+        });
     }
 }
