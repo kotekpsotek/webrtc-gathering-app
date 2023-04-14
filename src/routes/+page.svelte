@@ -149,6 +149,11 @@
         roomID = ""; // reset values from input to attach room identifier to join to it
         signalingRoomId = "not specified"; // reset value of room id used by whole WebRTC API
     }
+
+    // Used when user send next message using existing room connection chat
+    function userSendMessage({ detail }: CustomEvent) {
+
+    }
 </script>
 
 <div class="room-actions">
@@ -221,7 +226,7 @@
         </div>
     </div>
 {:else}
-    <Chat bind:value={valueToSendMessageOnChat}/>
+    <Chat bind:value={valueToSendMessageOnChat} on:message-sended={userSendMessage}/>
 {/if}
 
 <style>

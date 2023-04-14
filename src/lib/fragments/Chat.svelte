@@ -1,30 +1,82 @@
 <script lang="ts">
-    import { SendAltFilled } from "carbon-icons-svelte"
+    import { createEventDispatcher } from "svelte";
+    import { SendAltFilled } from "carbon-icons-svelte";
+    import { type ChatMessage, chatMessages } from "$lib/storages";
     
-    export let value: string;
+    export let value: string = "";
+
+    let focusOnMessageInput = true;
+
+    const dispatcher = createEventDispatcher();
+
+    /** Send message when user press "Enter" keyboard button and has got focus on message input element */
+    function userClickEnterWhileFocusOnMessageInput(ev: Event) {
+        if ((ev as KeyboardEvent).key == "Enter" && focusOnMessageInput) {
+            sendMessage(ev);
+        }
+    }
 
     /** Send message after click on button to send message */
+    /** Message will be send only when it content isn't empty */
     function sendMessage(ev: Event) {
+        if (value.length) { // Disable oportunity to send empty message
+            // Create event to save message from chat and send it to other user using RTC DataChannel
+            dispatcher("message-sended", value);
 
+            // Save message content into GUI
+            chatMessages.update(chatData => {
+                // Create this message object matched to chatData message object pattern
+                const thisNewMessage: ChatMessage = {
+                    type: "same-user",
+                    content: value
+                };
+
+                // Add message content to storage witch chat messages
+                chatData.push(thisNewMessage);
+                
+                // Update chat datas
+                return chatData;
+            });
+
+            // Reset input to pass message value
+            value = "";
+
+            // Scroll page maximum down
+            setTimeout(() => {
+                window.scroll({ top: document.body.scrollHeight, behavior: "smooth" });
+            }, 50)
+        }
+    }
+
+    /** When user click on input element to send message using mouse or laptop touchpad */
+    function userHasInputFocus() {
+        focusOnMessageInput = true;
+    }
+
+    /** When user click beyond input to send message */
+    function userLoseInputFocus() {
+        focusOnMessageInput = false;
     }
 </script>
+
+<!-- Allow user to send messages when user has got focus on input element to send messages and user click keyboard "Enter" key durning focus presence -->
+<svelte:body on:keypress={userClickEnterWhileFocusOnMessageInput}/>
 
 <div class="chat">
     <h2>Chat</h2>
     <div class="messages">
-        <div class="message me">
-            <div class="content">
-                <p>My message</p>
-            </div>
-        </div>
-        <div class="message other">
-            <div class="content">
-                <p>Other message</p>
-            </div>
-        </div>
+        {#key $chatMessages}
+            {#each $chatMessages as { type, content }}
+                <div class="message" class:me={type == "same-user"} class:other={type == "other-user"}>
+                    <div class="content">
+                        <p>{content}</p>
+                    </div>
+                </div>
+            {/each}
+        {/key}
     </div>
     <div class="add-message">
-        <input type="text" placeholder="Text message" bind:value>
+        <input type="text" placeholder="Text message" bind:value on:focus={userHasInputFocus} on:blur={userLoseInputFocus}>
         <button class="send-message" on:click={sendMessage}>
             <SendAltFilled size={24} fill="whitesmoke"/>
         </button>
@@ -57,6 +109,7 @@
     .messages {
         display: flex;
         flex-direction: column;
+        row-gap: 5px;
     }
 
     .messages .message.me {
