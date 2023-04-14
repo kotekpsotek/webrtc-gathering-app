@@ -82,7 +82,8 @@
             // Reset variables with states
             userAnotherIsConnected = false;
             anotherUserCameraStatus = "on";
-            signalingRoomId = "not specified"
+            signalingRoomId = "not specified";
+            roomID = "";
 
             // Create application visual aspects for leaving user event
             alert(`User ${uuid} leave connection room!`);
@@ -96,6 +97,9 @@
 
     // Create Room by click on button to create room
     async function createRoom(ev: Event) {
+        // Replace existing RTC connection by new connection to reduce amount of savage throwbacks susceptabilities
+        rtcConnection.assignNewConnection();
+        
         // Operation of creation new RTC room is at all performing by specjalized for that class instance
         const stream = await rtcConnection.createRoom();
 
@@ -108,6 +112,9 @@
 
     // Join to room after click on "join to room" button
     async function joinToRoom(ev: Event) {
+        // Replace existing RTC connection by new connection to reduce amount of savage throwbacks susceptabilities
+        rtcConnection.assignNewConnection();
+        
         // Operation of joining to existing RTC room connection (room which has been created prior time when we would like to join) is at all performing by specjalized for that class instance
         const stream = await rtcConnection.joinToRoom(roomID);
 
@@ -138,6 +145,9 @@
         rtcConnection.leaveConnection(signalingRoomId);
         // Whether another user is connected with us
         userAnotherIsConnected = false;
+        // Reset values stored by variables
+        roomID = ""; // reset values from input to attach room identifier to join to it
+        signalingRoomId = "not specified"; // reset value of room id used by whole WebRTC API
     }
 </script>
 

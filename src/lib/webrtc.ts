@@ -140,6 +140,12 @@ export class WebRTCConnection {
         });
     }
 
+    /** Close existing RTC connection and replace it by new created RTC connection */
+    assignNewConnection() {
+        this.rtcConnection.close();
+        this.rtcConnection = this.createRTCConnection();
+    }
+
     /** Creating room for calls */
     /** Return when all happens correctly MediaStream object with another user stream (using which you can attach stream to video preview HTML element) */
     createRoom(): Promise<MediaStream> {
@@ -246,11 +252,8 @@ export class WebRTCConnection {
             this.signalingChannelPortal.emit("user-leave-room", roomId, data.userId, (success: boolean) => {
                 // Disconnect user only when it is allowed by server side
                 if (success) {
-                    // Close RTC connection
-                    this.rtcConnection.close();
-
-                    // Assign new RTC connection
-                    this.rtcConnection = this.createRTCConnection();
+                    // Close existsing rtc connection and assign new to same class variable
+                    this.assignNewConnection();
                 }
             });
             
@@ -345,8 +348,7 @@ export class WebRTCConnection {
             this.anotherUserIsConnected = false;
 
             // Close existsing rtc connection and assign new to same class variable
-            this.rtcConnection.close();
-            this.rtcConnection = this.createRTCConnection();
+            this.assignNewConnection();
         });
     }
 }
