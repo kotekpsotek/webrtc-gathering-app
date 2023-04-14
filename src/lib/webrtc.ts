@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { userData } from "$lib/storages";
+import { userData, chatMessages, type ChatMessage } from "$lib/storages";
 
 type RoomIdentifier = string;
 class WebRTCSignalingChannel {
@@ -115,6 +115,7 @@ export class WebRTCConnection {
     anotherUserIsConnected: boolean;
     rtpUserSender?: RTCRtpSender;
     cameraTurnOnStatus: "on" | "off";
+    rtcDataChannel?: RTCDataChannel; // Data Channel used to send arbitary text messages over WebRTC
 
     constructor(localDeviceStream: MediaStream) {
         // WebRTC connection instance
@@ -153,6 +154,9 @@ export class WebRTCConnection {
             // Firstly create RTC signaling channel
             await this.signalingChannel.createSignalingRoom();
     
+            // Create WebRTC data channel
+            this.rtcDataChannel = this.createDataChannel(this.signalingChannel.roomId || `${Math.round(Math.random() * 100_000)}`);
+
             // Add video track to stream
             this.deviceStream.getTracks().forEach(track => this.rtpUserSender = this.rtcConnection.addTrack(track, this.deviceStream));
     
@@ -198,6 +202,15 @@ export class WebRTCConnection {
     
             // List with information about this user candidatures
             let thisCandidates: string[] = [];
+
+            // Listen for messages sended using WebRTC data channel
+            this.rtcConnection.addEventListener("datachannel", datachannel => {
+                // Assign data channel to e.g: allow user to send message over this channel
+                this.rtcDataChannel = datachannel.channel;
+
+                // Listen for messages recived from WebRTC data channel
+                datachannel.channel.onmessage = this.receiveMessageFromDataChannel
+            });
     
             // Add video track to stream
             this.deviceStream.getTracks()
@@ -322,6 +335,47 @@ export class WebRTCConnection {
         }
         
         return await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+
+    /** Create WebRTC data channel which is capable to send and recive from it arbitary text messages */
+    private createDataChannel(roomId: string) {
+        // Create data channel
+        const channel = this.rtcConnection.createDataChannel(roomId);
+
+        // Assign created WebRTC data channel to class property storing WebRTC Data Channel for connection
+        this.rtcDataChannel = channel;
+
+        // Listen for messages on data channel
+        this.rtcDataChannel?.addEventListener("message", this.receiveMessageFromDataChannel);
+
+        // Return created data channel
+        return channel;
+    }
+
+    /** Receive message from another user whose sended message over WebRTC data channel */
+    private receiveMessageFromDataChannel({ data }: RTCDataChannelEventMap["message"]) {
+        // Update chat messages data
+        chatMessages.update(chatDatas => {
+            // Create other user message patter which match to application patter for chat messages
+            const messagePattern: ChatMessage = {
+                type: "other-user",
+                content: data
+            };
+
+            // Add created message object at the end of messages list (end because received message is the latest message from application chat)
+            chatDatas.push(messagePattern);
+            
+            // Update chat datas by return updated chat messages list
+            return chatDatas;
+        });
+
+        // Scroll down window to show recently sended chat message
+        setTimeout(() => {
+            window.scroll({
+                top: document.body.scrollHeight,
+                behavior: "smooth"
+            });
+        }, 50) // Same timeout as in case when message is displaying in GUI to user which is creator of such message
     }
 
     /** Handle events which are same and are using in both cases: when user creating new RTC room, when user is joining to existing RTC room */

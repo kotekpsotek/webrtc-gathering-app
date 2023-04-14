@@ -152,7 +152,8 @@
 
     // Used when user send next message using existing room connection chat
     function userSendMessage({ detail }: CustomEvent) {
-
+        // Send message using WebRTC data channel to another user
+        rtcConnection.rtcDataChannel?.send(detail);
     }
 </script>
 
