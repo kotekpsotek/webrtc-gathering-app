@@ -6,9 +6,10 @@
     import Chat from "$lib/fragments/Chat.svelte";
     import GetUserName from "$lib/fragments/GetUserName.svelte";
 
-    // User name used in application
+    // User name used in application, user name and whether user click "Go" button on window to capture user name from user input
     let userName: string;
     let goFurtherPerformed = false;
+    let userID: string;
 
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
@@ -162,8 +163,21 @@
     }
 
     // Go further after pass by user, username
-    function goFurther() {
-        if (userName) goFurtherPerformed = true;
+    async function goFurther() {
+        const ajax = await fetch(document.URL, {
+            method: "POST",
+            headers: {
+                "content-type": "application/json"
+            },
+            body: JSON.stringify({ userName })
+        })
+
+        // Allow userr to go further only when server verifies passed by user "application user name"
+        if (ajax.status == 200) {
+            userID = (await ajax.json()).userId;
+            console.info(userID);
+            goFurtherPerformed = true;
+        }
     }
 </script>
 
