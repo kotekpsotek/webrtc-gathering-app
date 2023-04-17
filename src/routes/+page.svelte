@@ -11,6 +11,12 @@
     let goFurtherPerformed = false;
     let userID: string;
 
+    // Another connected user credential datas
+    let anotherConnectedUserData = {
+        userName: "",
+        userId: ""
+    }
+
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
     let videoElementAnotherUser: HTMLVideoElement;
@@ -55,6 +61,19 @@
         // Initialize class to perform RTC operations such as: joining to existing RTC connection, making new RTC connection room to allow other peers joining to that room
         rtcConnection = new WebRTCConnection(localDeviceStream);
 
+        // Send to other room users user name and id (performed when this user join to RTC Data Channel)
+        window.addEventListener("data-channel-joined", selfSendCredentials);
+
+        // When another user join to connection room in which is this user
+        window.addEventListener("new-user-joined", () => {
+            setTimeout(selfSendCredentials, 200);
+        });
+
+        // When from RTC data channel has been achived another connected user credential data
+        window.addEventListener("user-credentials", ({ detail: { otUserName, otUserId } }: any) => {
+            anotherConnectedUserData = { userId: otUserId, userName: otUserName };
+        });
+
         // Listen for changes in camera status for change performed by another user then this device user 
         rtcConnection.signalingChannelPortal.on("changed-camera-status", (byUserId: string, status: "on" | "off") => {
             if ($userData.userId != byUserId) {
@@ -90,15 +109,19 @@
             anotherUserCameraStatus = "on";
             signalingRoomId = "not specified";
             roomID = "";
+            anotherConnectedUserData = { userName: "", userId: "" }; // reset another connected user datas to empty datas
 
             // Create application visual aspects for leaving user event
             alert(`User ${uuid} leave connection room!`);
         });
-        
-        // Get stream and assign it to video element
-        localDeviceStream = await rtcConnection.getStream();
-        videoElementPreview.srcObject = localDeviceStream;
-        rtcConnection.deviceStream = localDeviceStream;
+
+        /* Functions definitions */
+        /** Send this user credentials to another users into room */
+        function selfSendCredentials() {
+            if (rtcConnection && rtcConnection?.rtcDataChannel && rtcConnection.rtcDataChannel.readyState == "open") {
+                rtcConnection.rtcDataChannel.send(JSON.stringify({ type: "user-credentials", data: { userName, userId: userID } }));
+            } 
+        }
     });
 
     // Create Room by click on button to create room
@@ -159,7 +182,7 @@
     // Used when user send next message using existing room connection chat
     function userSendMessage({ detail }: CustomEvent) {
         // Send message using WebRTC data channel to another user
-        rtcConnection.rtcDataChannel?.send(detail);
+        rtcConnection.rtcDataChannel?.send(JSON.stringify({ type: "message",  content: detail }));
     }
 
     // Go further after pass by user, username
@@ -175,8 +198,13 @@
         // Allow userr to go further only when server verifies passed by user "application user name"
         if (ajax.status == 200) {
             userID = (await ajax.json()).userId;
-            console.info(userID);
             goFurtherPerformed = true;
+
+            // --- Assign user camera to preview video html5 element ---
+            // Get stream and assign it to video element
+            localDeviceStream = await rtcConnection.getStream();
+            videoElementPreview.srcObject = localDeviceStream;
+            rtcConnection.deviceStream = localDeviceStream;
         }
     }
 </script>
@@ -196,20 +224,20 @@
 
         <div class="videos">
             <div class="your-view">
-                <div class="label your-stream">
-                    <p>Your preview</p>
-                </div>
                 <!-- svelte-ignore a11y-media-has-caption -->
                 <video autoplay src="" bind:this={videoElementPreview}></video>
+                <div class="user-name">
+                    {userName} (you)
+                </div>
             </div>
             <div class="another-user-view" data-connected="false">
                 {#if userAnotherIsConnected}
                     {#if anotherUserCameraStatus == "on"}
-                        <div class="label another-user-stream">
-                            <p>Another user preview</p>
-                        </div>
                         <!-- svelte-ignore a11y-media-has-caption -->
                         <video autoplay src="" bind:this={videoElementAnotherUser}></video>
+                        <div class="user-name">
+                            {anotherConnectedUserData.userName}
+                        </div>
                     {:else}
                         <div class="user-camera-off">
                             <p>User camera is turned off</p>
@@ -335,21 +363,14 @@
         background-color: rgba(255, 255, 255, 0.718);
     }
 
-    .videos div > div.label {
+    .videos div > div.user-name {
+        color: white;
         padding: 5px;
+        background-color: rgb(20, 20, 20);
+        border-radius: 4px;
         position: absolute;
-        top: 0px;
+        bottom: 0px;
         left: 0px;
-    }
-
-    .videos div > div.label[class*="your"] {
-        background-color: rgba(95, 158, 160, 0.8);
-        color: white;
-    }
-
-    .videos div > div.label[class*="another"] {
-        background-color: rgb(218, 84, 102, 0.8);
-        color: white;
     }
 
     /* Bar with buttons: turn off/on camera, leave with connections room (when any other user is connected with room) */

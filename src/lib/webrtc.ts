@@ -209,7 +209,11 @@ export class WebRTCConnection {
                 this.rtcDataChannel = datachannel.channel;
 
                 // Listen for messages recived from WebRTC data channel
-                datachannel.channel.onmessage = this.receiveMessageFromDataChannel
+                datachannel.channel.onmessage = this.receiveMessageFromDataChannel;
+
+                // Emit that user join to RTC data channel
+                const ev = new Event("data-channel-joined");
+                window.dispatchEvent(ev);
             });
     
             // Add video track to stream
@@ -354,28 +358,45 @@ export class WebRTCConnection {
 
     /** Receive message from another user whose sended message over WebRTC data channel */
     private receiveMessageFromDataChannel({ data }: RTCDataChannelEventMap["message"]) {
-        // Update chat messages data
-        chatMessages.update(chatDatas => {
-            // Create other user message patter which match to application patter for chat messages
-            const messagePattern: ChatMessage = {
-                type: "other-user",
-                content: data
-            };
+        const messageData = JSON.parse(data);
 
-            // Add created message object at the end of messages list (end because received message is the latest message from application chat)
-            chatDatas.push(messagePattern);
-            
-            // Update chat datas by return updated chat messages list
-            return chatDatas;
-        });
+        // Handle RTC data channel message types
+        switch(messageData.type) {
+            // When user receive message from another connected user
+            case "message":
+                // Update chat messages data
+                chatMessages.update(chatDatas => {
+                    // Create other user message patter which match to application patter for chat messages
+                    const messagePattern: ChatMessage = {
+                        type: "other-user",
+                        content: messageData.content
+                    };
+        
+                    // Add created message object at the end of messages list (end because received message is the latest message from application chat)
+                    chatDatas.push(messagePattern);
+                    
+                    // Update chat datas by return updated chat messages list
+                    return chatDatas;
+                });
+        
+                // Scroll down window to show recently sended chat message
+                setTimeout(() => {
+                    window.scroll({
+                        top: document.body.scrollHeight,
+                        behavior: "smooth"
+                    });
+                }, 50) // Same timeout as in case when message is displaying in GUI to user which is creator of such message
+            break;
 
-        // Scroll down window to show recently sended chat message
-        setTimeout(() => {
-            window.scroll({
-                top: document.body.scrollHeight,
-                behavior: "smooth"
-            });
-        }, 50) // Same timeout as in case when message is displaying in GUI to user which is creator of such message
+            // When user recive credentials from another connected user
+            case "user-credentials":
+                const { userName, userId } = messageData.data;
+                console.info("Credentials received!", userName, userId);
+
+                const ev = new CustomEvent("user-credentials", { detail: { otUserName: userName, otUserId: userId } });
+                window.dispatchEvent(ev);
+            break;
+        }
     }
 
     /** Handle events which are same and are using in both cases: when user creating new RTC room, when user is joining to existing RTC room */
@@ -394,7 +415,11 @@ export class WebRTCConnection {
             this.anotherUserIsConnected = true;
 
             this.rtcConnection.addIceCandidate()
-                .then(() => console.log("IceCandidate has been added to connection!"))
+                .then(() => console.log("IceCandidate has been added to connection!"));
+
+            // Emit to whole widnow that new user have just joined to room
+            const ev = new Event("new-user-joined");
+            window.dispatchEvent(ev);
         })
 
         // Listen that other user is leaving room
