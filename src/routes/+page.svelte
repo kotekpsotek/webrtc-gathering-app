@@ -4,6 +4,11 @@
     import { userData } from "$lib/storages";
     import { VideoFilled, VideoOffFilled, PhoneOffFilled, PhoneFilled, PhoneVoiceFilled } from "carbon-icons-svelte"; // Import icons from great icons library
     import Chat from "$lib/fragments/Chat.svelte";
+    import GetUserName from "$lib/fragments/GetUserName.svelte";
+
+    // User name used in application
+    let userName: string;
+    let goFurtherPerformed = false;
 
     // HTML element is assigned to this element after application load
     let videoElementPreview: HTMLVideoElement;
@@ -155,79 +160,92 @@
         // Send message using WebRTC data channel to another user
         rtcConnection.rtcDataChannel?.send(detail);
     }
+
+    // Go further after pass by user, username
+    function goFurther() {
+        if (userName) goFurtherPerformed = true;
+    }
 </script>
 
-<div class="room-actions">
-    <div class="room-id">
-        <p>Your room id: </p>
-        <p id="source">{signalingRoomId}</p>
-    </div>
+<!-- Get user name -->
+{#if !goFurtherPerformed}
+    <GetUserName bind:userName on:click={goFurther}/>
+{/if}
 
-    <div class="videos">
-        <div class="your-view">
-            <div class="label your-stream">
-                <p>Your preview</p>
-            </div>
-            <!-- svelte-ignore a11y-media-has-caption -->
-            <video autoplay src="" bind:this={videoElementPreview}></video>
+<!-- Add to view when user name has been passed -->
+{#if userName && goFurtherPerformed}
+    <div class="room-actions">
+        <div class="room-id">
+            <p>Your room id: </p>
+            <p id="source">{signalingRoomId}</p>
         </div>
-        <div class="another-user-view" data-connected="false">
-            {#if userAnotherIsConnected}
-                {#if anotherUserCameraStatus == "on"}
-                    <div class="label another-user-stream">
-                        <p>Another user preview</p>
-                    </div>
-                    <!-- svelte-ignore a11y-media-has-caption -->
-                    <video autoplay src="" bind:this={videoElementAnotherUser}></video>
-                {:else}
-                    <div class="user-camera-off">
-                        <p>User camera is turned off</p>
-                    </div>
-                {/if}
-            {:else}
-                <div class="not-connected">
-                    <p>No one user is connected!</p>
+
+        <div class="videos">
+            <div class="your-view">
+                <div class="label your-stream">
+                    <p>Your preview</p>
                 </div>
-            {/if}
-        </div>
-    </div>
-
-    <div class="actions">
-        <div class="zone">
-            <button id="on-off-camera" on:click={manageCameraOnAndOff} class:turned-on={rtcConnection?.cameraTurnOnStatus == "on"}>
-                {#if rtcConnection?.cameraTurnOnStatus == "on"}
-                    <VideoOffFilled size={24} fill="white"/>
-                {:else if rtcConnection?.cameraTurnOnStatus == "off"}
-                    <VideoFilled size={24} fill="white"/>
+                <!-- svelte-ignore a11y-media-has-caption -->
+                <video autoplay src="" bind:this={videoElementPreview}></video>
+            </div>
+            <div class="another-user-view" data-connected="false">
+                {#if userAnotherIsConnected}
+                    {#if anotherUserCameraStatus == "on"}
+                        <div class="label another-user-stream">
+                            <p>Another user preview</p>
+                        </div>
+                        <!-- svelte-ignore a11y-media-has-caption -->
+                        <video autoplay src="" bind:this={videoElementAnotherUser}></video>
+                    {:else}
+                        <div class="user-camera-off">
+                            <p>User camera is turned off</p>
+                        </div>
+                    {/if}
+                {:else}
+                    <div class="not-connected">
+                        <p>No one user is connected!</p>
+                    </div>
                 {/if}
-            </button>
-            {#if userAnotherIsConnected}
-                <button id="leave-from-room" on:click={leaveUserFromRTCConnection}>
-                    <PhoneOffFilled size={24} fill="white"/>
-                </button>
-            {/if}
+            </div>
         </div>
-    </div>
-</div>
 
-{#if !userAnotherIsConnected}
-    <div class="choose-bar">
-        <h2>Connection manipulation stripe:</h2>
-        <div class="cl1">
-            <input type="text" placeholder="ROOM ID" bind:value={roomID}>
-            <button on:click={joinToRoom}>
-                <PhoneFilled size={20} fill="white"/>
-            </button>
-        </div>
-        <div class="cl2">
-            <button on:click={createRoom}>
-                Create Connection
-                <PhoneVoiceFilled size={20} fill="white"/>
-            </button>
+        <div class="actions">
+            <div class="zone">
+                <button id="on-off-camera" on:click={manageCameraOnAndOff} class:turned-on={rtcConnection?.cameraTurnOnStatus == "on"}>
+                    {#if rtcConnection?.cameraTurnOnStatus == "on"}
+                        <VideoOffFilled size={24} fill="white"/>
+                    {:else if rtcConnection?.cameraTurnOnStatus == "off"}
+                        <VideoFilled size={24} fill="white"/>
+                    {/if}
+                </button>
+                {#if userAnotherIsConnected}
+                    <button id="leave-from-room" on:click={leaveUserFromRTCConnection}>
+                        <PhoneOffFilled size={24} fill="white"/>
+                    </button>
+                {/if}
+            </div>
         </div>
     </div>
-{:else}
-    <Chat bind:value={valueToSendMessageOnChat} on:message-sended={userSendMessage}/>
+
+    {#if !userAnotherIsConnected}
+        <div class="choose-bar">
+            <h2>Connection manipulation stripe:</h2>
+            <div class="cl1">
+                <input type="text" placeholder="ROOM ID" bind:value={roomID}>
+                <button on:click={joinToRoom}>
+                    <PhoneFilled size={20} fill="white"/>
+                </button>
+            </div>
+            <div class="cl2">
+                <button on:click={createRoom}>
+                    Create Connection
+                    <PhoneVoiceFilled size={20} fill="white"/>
+                </button>
+            </div>
+        </div>
+    {:else}
+        <Chat bind:value={valueToSendMessageOnChat} on:message-sended={userSendMessage}/>
+    {/if}
 {/if}
 
 <style>
