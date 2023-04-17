@@ -302,7 +302,7 @@ export class WebRTCConnection {
         } 
         else { // Turn On camera
             // Turn camera on again
-            this.deviceStream = await this.getStream();
+            this.deviceStream = await this.getStream("user");
             
             // Add camera again to RTC streem connection
             const senders = this.rtcConnection.getSenders();
@@ -331,14 +331,30 @@ export class WebRTCConnection {
         });
     }
 
+    /** Change camera from which stream is capturing (choosen from this device cameras set) */
+    async changeCamera(cameraMode: "user" | "environment", previewHTMLVideo: HTMLVideoElement) {
+        this.deviceStream = await this.getStream(cameraMode);
+
+        // Add new camera preview to html preview video element
+        previewHTMLVideo.srcObject = this.deviceStream;
+
+        // Add camera again to RTC stream connection (it will be performed only when connection with another users exists)
+        const senders = this.rtcConnection?.getSenders();
+        if (senders.length) {
+            const fstSender = senders[0];
+            this.deviceStream.getTracks()
+                .forEach(async track => await fstSender.replaceTrack(track))
+        }
+    }
+
     /** Get access to stream from user mediaDevice camera */
-    async getStream() {
+    async getStream(cameraToUser: "user" | "environment") {
         // Get stream from camera
         if (!navigator.mediaDevices) {
             alert("Your camera and microphone isn't avaiable!")
         }
         
-        return await navigator.mediaDevices.getUserMedia({ video: true });
+        return await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraToUser } });
     }
 
     /** Create WebRTC data channel which is capable to send and recive from it arbitary text messages */

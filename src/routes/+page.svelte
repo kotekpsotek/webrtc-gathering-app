@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import { WebRTCConnection } from "$lib/webrtc";
     import { userData } from "$lib/storages";
-    import { VideoFilled, VideoOffFilled, PhoneOffFilled, PhoneFilled, PhoneVoiceFilled } from "carbon-icons-svelte"; // Import icons from great icons library
+    import { VideoFilled, VideoOffFilled, PhoneOffFilled, PhoneFilled, PhoneVoiceFilled, DataShare } from "carbon-icons-svelte"; // Import icons from great icons library
     import Chat from "$lib/fragments/Chat.svelte";
     import GetUserName from "$lib/fragments/GetUserName.svelte";
 
@@ -185,7 +185,7 @@
         rtcConnection.rtcDataChannel?.send(JSON.stringify({ type: "message",  content: detail }));
     }
 
-    // Go further after pass by user, username
+    /** Go further in GUI way after pass by user, username */
     async function goFurther() {
         const ajax = await fetch(document.URL, {
             method: "POST",
@@ -202,11 +202,41 @@
 
             // --- Assign user camera to preview video html5 element ---
             // Get stream and assign it to video element
-            localDeviceStream = await rtcConnection.getStream();
+            localDeviceStream = await rtcConnection.getStream("user");
             videoElementPreview.srcObject = localDeviceStream;
             rtcConnection.deviceStream = localDeviceStream;
         }
     }
+
+    /** Get count of camera devices from computer/mobile phone */
+    function getCameraMediaDevivesCount(): Promise<number> {
+        return new Promise((resolve, reject) => {
+            let videoDevicesCount = 0;
+
+            navigator.mediaDevices.enumerateDevices()
+                .then(devices => {
+                    for (const device of devices) {
+                        if (device.kind == "videoinput") {
+                            videoDevicesCount++;
+                        }
+                    };
+
+                    // Return count of cameras from function
+                    resolve(videoDevicesCount)
+                });
+
+        })
+    }
+
+    let actualUsingCamera: "user" | "environment" = "user";
+    /** Change which camera is using into existing connection or in feature connections */
+    async function changeCamera(ev: Event) {
+        // Change status which camera is using
+        actualUsingCamera == "user" ? actualUsingCamera = "environment" : actualUsingCamera = "user";
+
+        // Change which camera is used inyo stream
+        rtcConnection.changeCamera(actualUsingCamera, videoElementPreview);
+    }   
 </script>
 
 <!-- Get user name -->
@@ -260,6 +290,13 @@
                         <VideoFilled size={24} fill="white"/>
                     {/if}
                 </button>
+                {#await getCameraMediaDevivesCount() then camerasCount}
+                    {#if camerasCount > 1}
+                        <button id="revers-camera" title="User other camera" on:click={changeCamera}>
+                            <DataShare size={24} fill="white"/>
+                        </button>
+                    {/if}
+                {/await}
                 {#if userAnotherIsConnected}
                     <button id="leave-from-room" on:click={leaveUserFromRTCConnection}>
                         <PhoneOffFilled size={24} fill="white"/>
@@ -414,6 +451,10 @@
 
     button#leave-from-room {
         background-color: black;
+    }
+
+    button#revers-camera {
+        background-color: rgb(16, 97, 70);
     }
 
     div.choose-bar {
