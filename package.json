@@ -20,6 +20,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"carbon-icons-svelte": "^11.4.0"
+		"carbon-icons-svelte": "^11.4.0",
+		"vite-plugin-mkcert": "^1.14.0"
 	}
 }
