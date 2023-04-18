@@ -265,14 +265,14 @@
                     {#if anotherUserCameraStatus == "on"}
                         <!-- svelte-ignore a11y-media-has-caption -->
                         <video autoplay src="" bind:this={videoElementAnotherUser}></video>
-                        <div class="user-name">
-                            {anotherConnectedUserData.userName}
-                        </div>
                     {:else}
                         <div class="user-camera-off">
                             <p>User camera is turned off</p>
                         </div>
                     {/if}
+                    <div class="user-name">
+                        {anotherConnectedUserData.userName}
+                    </div>
                 {:else}
                     <div class="not-connected">
                         <p>No one user is connected!</p>
@@ -408,6 +408,13 @@
         position: absolute;
         bottom: 0px;
         left: 0px;
+    }
+
+    /* Inform other connected user that second user turn off camera */
+    .videos div .user-camera-off {
+        padding: 5px;
+        color: white;
+        background-color: rgba(112, 0, 0, 0.505);
     }
 
     /* Bar with buttons: turn off/on camera, leave with connections room (when any other user is connected with room) */
