@@ -515,4 +515,10 @@
         color: white;
         cursor: pointer;
     }
+
+    @media only screen and (max-width: 1000px) {
+        .videos > div {
+            max-height: 200px;
+        }
+    }
 </style>

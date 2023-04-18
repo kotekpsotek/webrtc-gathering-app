@@ -289,7 +289,7 @@ export class WebRTCConnection {
             this.deviceStream.getTracks()[0].stop();
 
             // Remove stream from RTC connection
-            if (this.rtpUserSender) {
+            if (this.rtpUserSender && this.rtcConnection.connectionState == "connected") {
                 this.rtcConnection.removeTrack(this.rtpUserSender);
             }
 

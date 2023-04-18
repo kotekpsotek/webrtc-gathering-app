@@ -2,6 +2,9 @@ import type { Server } from "socket.io";
 import { randomUUID } from "crypto";
 import { RedisClientType, createClient } from "redis";
 
+// Fullpath is used because then compiled to javascript file will be in other directory and more accurately in: "./build"
+import nativeModule = require("C:/Users/micha/Desktop/project_2/vite-project/native-manners/index.node"); // importing of native module in TypeScript must look like here to compile TypeScript to JavaScript in eligable way
+
 /** Manage candidates from room */
 type CandidatesLenFromRoom = number;
 class RoomCandidates {
@@ -25,18 +28,7 @@ class RoomCandidates {
 
         // Return candidates list from database without user id to which each candidate object belongs to
         const candidatesList = await this.client.LRANGE(this.key, 0, candidatesLen); // Non prepatred candidates list obtained from database
-        let readyList: string[] = []; // Prepared candidates list returning from this function
-        for (let id = 0; id < candidatesLen; id++) {
-            let candidateSelected = candidatesList[id];
-
-            // Delete user identifier from candidate, from db key
-            const cSp = candidateSelected.split(":");
-            cSp.splice(0, 1); // remove user id from candidate schema
-
-            // Assign to returning candidate list new prepared candidate shema
-            candidateSelected = cSp.join(":").trim();
-            readyList.push(candidateSelected);
-        }
+        let readyList: string[] = nativeModule.split_candidates(candidatesList)[1]; // List with ready candidates
         
         return readyList;
     }
@@ -49,16 +41,15 @@ class RoomCandidates {
 
         // Return candidates list from database without user id to which each candidate object belongs to
         const candidatesList = await this.client.LRANGE(this.key, 0, candidatesLen); // Non prepatred candidates list obtained from database
+        const dbUserIds = nativeModule.split_candidates(candidatesList)[0];
 
         // List with user ids which are in room
         const userIdsList: string[] = [];
 
         // Add user ids to list with user ids
-        candidatesList.forEach(key => {
-            const userId = key.split(":")[0];
-
+        dbUserIds.forEach(uuid => {
             // Add user id to identifiers list only when into it isn't already iterated user identifier
-            if (!userIdsList.includes(userId)) userIdsList.push(userId);
+            if (!userIdsList.includes(uuid)) userIdsList.push(uuid);
         });
 
         return userIdsList;
@@ -73,12 +64,13 @@ class RoomCandidates {
     async removeIceCandidate(userId: string) {
         const candidatesLen = await this.client.LLEN(this.key);
         const candidatesList = await this.client.LRANGE(this.key, 0, candidatesLen); // Candidates list obtained from database
+        const [candidatesIds, candidatesRTCCandidate] = nativeModule.split_candidates(candidatesList); // Ids of users which
 
         const readyCandidates: string[] = [];
-        for (const candidate of candidatesList) {
-            const userCandidateId = candidate.split(":")[0];
+        for (let i = 0; i < candidatesLen; i++) {
+            const uuid = candidatesIds[i];
 
-            if (userCandidateId != userId) readyCandidates.push(candidate);
+            if (uuid != userId) readyCandidates.push(`${uuid}:${candidatesRTCCandidate[i]}`);
         }
 
         // Remove old list and insert new
