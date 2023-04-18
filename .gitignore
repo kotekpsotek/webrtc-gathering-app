@@ -9,3 +9,8 @@ node_modules
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 server-http/build
+native-manners/beyond/*
+native-manners/target
+*/Cargo.lock
+native-manners/README.md
+package-lock.json
